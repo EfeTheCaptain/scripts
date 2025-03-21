@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Dependencies
-deps=("yt-dlp" "fzf" "mpv")
+declare -a deps=("yt-dlp" "fzf" "mpv")
 
 # Check dependencies
 check_failed=false
@@ -11,7 +11,8 @@ for dep in "${deps[@]}"; do
     check_failed=true
   fi
 done
-if $check_failed; then
+if [[ "$check_failed" == "true" ]]; then
+  echo "Please install the missing dependencies." >&2
   exit 1
 fi
 
@@ -22,24 +23,32 @@ search_size=10 # Reduced default
 get_video_url() {
   local query="$1"
 
-  local results=$(yt-dlp -j --flat-playlist "ytsearch$search_size:$query" 2>/dev/null)
+  # Get video results from yt-dlp
+  local results
+  results=$(yt-dlp -j --flat-playlist "ytsearch$search_size:$query" 2>/dev/null)
 
+  # Check if results are empty
   if [[ -z "$results" ]]; then
-    echo "No videos found."
+    echo "No videos found." >&2
     return 1
   fi
 
-  local selection=$(echo "$results" |
+  # Select video using fzf
+  local selection
+  selection=$(echo "$results" |
     jq -c '.' |
     fzf --height "40%" --reverse --header "Select video" --print0
   )
 
+  # Check if a selection was made
   if [[ -z "$selection" ]]; then
-    echo "No video selected."
+    echo "No video selected." >&2
     return 1
   fi
 
-  local url=$({ echo "$selection" | xargs -0 jq -r '.url'; })
+  # Extract video URL
+  local url
+  url=$(echo "$selection" | xargs -0 jq -r '.url')
 
   echo "$url"
   return 0
@@ -48,16 +57,21 @@ get_video_url() {
 play_video() {
   local url="$1"
   if [[ -n "$url" ]]; then
-    mpv --really-quiet "$url" &
+    echo "Playing video..."
+    mpv --really-quiet --no-terminal "$url" &   # Play in background
   fi
 }
 
 # Main
 read -p "Enter search query: " query
 
+# Proceed if query is not empty
 if [[ -n "$query" ]]; then
   video_url=$(get_video_url "$query")
   if [[ -n "$video_url" ]]; then
     play_video "$video_url"
   fi
-}
+else
+  echo "No query entered. Exiting..." >&2
+  exit 1
+fi
