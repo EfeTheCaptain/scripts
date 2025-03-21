@@ -1,0 +1,73 @@
+#!/bin/bash
+
+# Dependencies
+deps=("yt-dlp" "jq" "mpv")
+
+# Check dependencies
+check_failed=false
+for dep in "${deps[@]}"; do
+  if ! command -v "$dep" &>/dev/null; then
+    echo "Error: $dep is not installed." >&2
+    check_failed=true
+  fi
+done
+if $check_failed; then
+  exit 1
+fi
+
+# Configuration
+search_size=10 # Reduced default
+
+# Functions
+get_video_url() {
+  local query="$1"
+  local results
+  
+  results=$(yt-dlp -j --flat-playlist "ytsearch$search_size:$query" 2>/dev/null | jq -c '.')
+
+  if [[ -z "$results" ]]; then
+    echo "No videos found."
+    return 1
+  fi
+
+  options=()
+  while IFS= read -r result; do
+    local title=$(echo "$result" | jq -r '.title')
+    local uploader=$(echo "$result" | jq -r '.uploader')
+    options+=("$title :: $uploader")
+  done <<< "$results"
+
+  if [[ ${#options[@]} -eq 0 ]]; then
+    echo "No videos found."
+    return 1
+  fi
+
+  echo "Select video:"
+  select choice in "${options[@]}"; do
+    if [[ -n "$choice" ]]; then
+      local selected_index=$((REPLY - 1))
+      local url=$(echo "$results" | jq -r --arg index "$selected_index" '.[$index | tonumber].url')
+      echo "$url"
+      return 0
+    else
+      echo "Invalid selection." >&2
+    fi
+  done
+}
+
+play_video() {
+  local url="$1"
+  if [[ -n "$url" ]]; then
+    mpv --really-quiet "$url" &
+  fi
+}
+
+# Main
+read -p "Enter search query: " query
+
+if [[ -n "$query" ]]; then
+  video_url=$(get_video_url "$query")
+  if [[ -n "$video_url" ]]; then
+    play_video "$video_url"
+  fi
+fi
