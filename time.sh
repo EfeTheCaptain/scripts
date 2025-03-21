@@ -22,4 +22,4 @@ esac
 #	"12") icon="🕛" ;;
 #esac
 
-date "+%I:%M%p"
+date "+%H:%M"

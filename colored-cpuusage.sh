@@ -36,9 +36,9 @@ done
 
 # Determine color for the  icon
 if [ "$max_usage" -le 5 ]; then
-    color="^c#26b51f^"
-elif [ "$max_usage" -le 10 ]; then
     color="^c#1f56b5^"
+elif [ "$max_usage" -le 10 ]; then
+    color="^c#26b51f^"
 elif [ "$max_usage" -le 20 ]; then
     color="^c#1fa4b5^"
 elif [ "$max_usage" -le 30 ]; then
@@ -58,6 +58,13 @@ elif [ "$max_usage" -le 90 ]; then
 else
     color="^c#bd1919^"
 fi
+
+case $BLOCK_BUTTON in
+    1) notify-send "🖥 CPU hogs" "$(ps axch -o cmd,%cpu | awk '{cmd[$1]+=$2} END {for (i in cmd) print i, cmd[i]}' | sort -nrk2 | head)\\n(100% per core)" ;;
+    2) st -e htop ;;
+    6) st -e nvim "$0" ;;
+esac
+
 
 # Output with colored icon
 printf "%s^d^ %.0f%%\n" "$color" "$max_usage"
