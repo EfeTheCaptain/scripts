@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# Function to display memory hogs
+show_memory_hogs() {
+    notify-send " Memory hogs" "$(ps -eo cmd,%mem --sort=-%mem | awk 'NR<=10{print $0}')"
+}
+
+# Function to show memory usage
+show_memory_usage() {
+    free -m | awk 'NR==2{printf "  %dMB/%.0fGB\n", $3, ($2/1024)}'
+}
+
+# Handle click events
+case $BLOCK_BUTTON in
+    1) show_memory_hogs ;;  # Left-click → Memory hogs
+    2) setsid -f st -e htop ;;  # Middle-click → htop
+    3) notify-send " Memory module" "\- Shows Memory Used/Total.
+        - Click to show memory hogs.
+        - Middle click to open htop." ;;  # Right-click → Description
+    6) st -e nvim "$0" ;;  # Middle-click on block → Edit script
+esac
+
+# Display memory usage
+show_memory_usage
