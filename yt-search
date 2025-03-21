@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Dependencies
-deps=("yt-dlp" "jq" "mpv")
+deps=("yt-dlp" "fzf" "mpv")
 
 # Check dependencies
 check_failed=false
@@ -21,38 +21,44 @@ search_size=10 # Reduced default
 # Functions
 get_video_url() {
   local query="$1"
-  local results
-  
-  results=$(yt-dlp -j --flat-playlist "ytsearch$search_size:$query" 2>/dev/null | jq -c '.')
+
+  local results=$(yt-dlp -j --flat-playlist "ytsearch$search_size:$query" 2>/dev/null)
 
   if [[ -z "$results" ]]; then
     echo "No videos found."
     return 1
   fi
 
-  options=()
-  while IFS= read -r result; do
-    local title=$(echo "$result" | jq -r '.title')
-    local uploader=$(echo "$result" | jq -r '.uploader')
-    options+=("$title :: $uploader")
-  done <<< "$results"
+  local selection=$(echo "$results" | \
+    jq -c '.' | \
+    while IFS= read -r result; do
+      local title=$(echo "$result" | jq -r '.title')
+      local uploader=$(echo "$result" | jq -r '.uploader')
+      echo "$title :: $uploader"
+    done | \
+    fzf --height "40%" --reverse --header "Select video" | \
+    cut -d' ' -f1
+  )
 
-  if [[ ${#options[@]} -eq 0 ]]; then
-    echo "No videos found."
+  if [[ -z "$selection" ]]; then
+    echo "No video selected."
     return 1
   fi
 
-  echo "Select video:"
-  select choice in "${options[@]}"; do
-    if [[ -n "$choice" ]]; then
-      local selected_index=$((REPLY - 1))
-      local url=$(echo "$results" | jq -r --arg index "$selected_index" '.[$index | tonumber].url')
-      echo "$url"
-      return 0
-    else
-      echo "Invalid selection." >&2
-    fi
-  done
+  local url=$(echo "$results" | \
+    jq -c '.' | \
+    while IFS= read -r result; do
+      local title=$(echo "$result" | jq -r '.title')
+      if [[ "$title" == "$selection" ]]; then
+        echo "$result"
+        break
+      fi
+    done | \
+    jq -r '.url'
+  )
+
+  echo "$url"
+  return 0
 }
 
 play_video() {
