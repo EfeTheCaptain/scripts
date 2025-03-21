@@ -16,7 +16,7 @@ get_discharging_emoji() {
 
 get_color() {
     local capacity=$1
-    if [ "$capacity" -le 10 ]; then echo "^c#ee0909^"; elif [ "$capacity" -le 20 ]; then echo "^c#ee2809^"; elif [ "$capacity" -le 30 ]; then echo "^c#ee5809^"; elif [ "$capacity" -le 40 ]; then echo "^c#ee9809^"; elif [ "$capacity" -le 50 ]; then echo "^c#e3ee09^"; elif [ "$capacity" -le 60 ]; then echo "^c#b1ee09^"; elif [ "$capacity" -le 70 ]; then echo "^c#78ee09^"; elif [ "$capacity" -le 80 ]; then echo "^c#28ee09^"; elif [ "$capacity" -le 90 ]; then echo "^c#09eec4^"; else echo "^c#0942ee^"; fi
+    if [ "$capacity" -le 10 ]; then echo "<span foreground=\"#ee0909\">"; elif [ "$capacity" -le 20 ]; then echo "<span foreground=\"#ee2809\">"; elif [ "$capacity" -le 30 ]; then echo "<span foreground=\"#ee5809\">"; elif [ "$capacity" -le 40 ]; then echo "<span foreground=\"#ee9809\">"; elif [ "$capacity" -le 50 ]; then echo "<span foreground=\"#e3ee09\">"; elif [ "$capacity" -le 60 ]; then echo "<span foreground=\"#b1ee09\">"; elif [ "$capacity" -le 70 ]; then echo "<span foreground=\"#78ee09\">"; elif [ "$capacity" -le 80 ]; then echo "<span foreground=\"#28ee09\">"; elif [ "$capacity" -le 90 ]; then echo "<span foreground=\"#09eec4\">"; else echo "<span foreground=\"#0942ee\">"; fi
 }
 
 # Loop through all attached batteries and build output
@@ -53,7 +53,7 @@ for battery in /sys/class/power_supply/BAT?*; do
                 ;;
         esac
 
-        output+="${color}${emoji}^d^ ${capacity}% " # Append to output string
+        output+="${color}${emoji}</span>^d^ ${capacity}% " # Append to output string
     else
         output+="Error: Could not read battery info "
     fi
