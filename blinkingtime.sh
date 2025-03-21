@@ -1,9 +1,11 @@
 #!/bin/bash
 
-while true; do
-  read -r hour minute < <(date +"%H %M")
-  printf "\r$hour:$minute"
-  sleep 1
-  printf "\r$hour $minute"
-  sleep 1
-done
+# Get the hour and minute only once
+read -r hour minute < <(date +"%H %M")
+
+# Blink the colon (alternates every second)
+if [ $(( $(date +%s) % 2 )) -eq 0 ]; then
+  echo "$hour:$minute"
+else
+  echo "$hour $minute"
+fi
