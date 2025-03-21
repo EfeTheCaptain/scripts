@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Status bar module for disk space
+# $1 should be drive mountpoint, otherwise assumed /.
+
+location=${1:-/}
+
+[ -d "$location" ] || exit
+
+case $BLOCK_BUTTON in
+        1) notify-send "💽 Disk space" "$(df -h --output=target,used,size)" ;;
+        3) notify-send "💽 Disk module" "\- Shows used hard drive space.
+- Click to show all disk info." ;;
+        6) st -e nvim "$0" ;;
+esac
+
+# Get usage percentages for home and root
+home_usage=$(df "/home" | awk 'NR==2 {print $5}') # Percentage of usage for home
+root_usage=$(df "/" | awk 'NR==2 {print $5}')   # Percentage of usage for root
+
+# Determine icons and print combined output
+icon_home=""
+icon_root="" # You can change this icon if desired
+
+# Format output
+printf "%s %s|%s %s\n" "$icon_home" "$home_usage" "$icon_root" "$root_usage"
