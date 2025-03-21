@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Dependencies
-declare -a deps=("yt-dlp" "fzf" "mpv")
+declare -a deps=("yt-dlp" "fzf" "mpv" "jq")
 
 # Check dependencies
 check_failed=false
@@ -26,6 +26,8 @@ get_video_url() {
   # Get video results from yt-dlp
   local results
   results=$(yt-dlp -j --flat-playlist "ytsearch$search_size:$query" 2>/dev/null)
+  echo "yt-dlp results:"
+  echo "$results"
 
   # Check if results are empty
   if [[ -z "$results" ]]; then
@@ -39,6 +41,8 @@ get_video_url() {
     jq -c '.' |
     fzf --height "40%" --reverse --header "Select video" --print0
   )
+  echo "fzf selection:"
+  echo "$selection"
 
   # Check if a selection was made
   if [[ -z "$selection" ]]; then
@@ -49,6 +53,8 @@ get_video_url() {
   # Extract video URL
   local url
   url=$(echo "$selection" | xargs -0 jq -r '.url')
+  echo "Selected URL:"
+  echo "$url"
 
   echo "$url"
   return 0
