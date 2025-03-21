@@ -35,12 +35,13 @@ get_video_url() {
     return 1
   fi
 
+  # Extract title and URL from results
+  local titles
+  titles=$(echo "$results" | jq -r '.title + " (" + .id + ")"')
+
   # Select video using fzf
   local selection
-  selection=$(echo "$results" |
-    jq -c '.' |
-    fzf --height "40%" --reverse --header "Select video" --print0
-  )
+  selection=$(echo "$titles" | fzf --height "40%" --reverse --header "Select video")
   echo "fzf selection:"
   echo "$selection"
 
@@ -50,9 +51,10 @@ get_video_url() {
     return 1
   fi
 
-  # Extract video URL
-  local url
-  url=$(echo "$selection" | xargs -0 jq -r '.url')
+  # Extract URL from results
+  local index
+  index=$(echo "$titles" | grep -n "$selection" | cut -d: -f1)
+  url=$(echo "$results" | jq -r ".[$((index-1))].url")
   echo "Selected URL:"
   echo "$url"
 
