@@ -29,7 +29,7 @@ get_video_url() {
     return 1
   fi
 
-  local selection=$(echo "$results" | \
+ local selection=$(echo "$results" | \
     jq -c '.' | \
     while IFS= read -r result; do
       local title=$(echo "$result" | jq -r '.title')
@@ -56,7 +56,6 @@ get_video_url() {
     done | \
     jq -r '.url'
   )
-
   echo "$url"
   return 0
 }
