@@ -7,15 +7,19 @@ get_video_url() {
     return 1
   fi
 
+  echo "Searching for: $query"
+
   # Get video results from yt-dlp
   local results
   results=$(yt-dlp -j --flat-playlist "ytsearch$search_size:$query" 2>/dev/null)
-  
+
   # Check if results are empty or invalid
   if [[ -z "$results" ]]; then
     echo "Error: yt-dlp returned no results." >&2
     return 1
   fi
+
+  echo "yt-dlp results fetched."
 
   # Validate that the results are in a valid JSON array format
   if ! echo "$results" | jq -e 'if type == "array" then exit(0) else exit(1) end' >/dev/null 2>&1; then
@@ -33,6 +37,9 @@ get_video_url() {
     return 1
   fi
 
+  echo "Video titles extracted: "
+  echo "$titles"
+
   # Select a video using fzf
   local selection
   selection=$(echo "$titles" | fzf --height "40%" --reverse --header="Select a video")
@@ -43,6 +50,8 @@ get_video_url() {
     return 1
   fi
 
+  echo "Selected video: $selection"
+
   # Find the index of the selected video
   local index
   index=$(echo "$titles" | grep -n "$selection" | cut -d: -f1)
@@ -52,6 +61,8 @@ get_video_url() {
     echo "Error: Unable to find the selected video index." >&2
     return 1
   fi
+
+  echo "Selected video index: $index"
 
   # Extract the video URL using the index
   local url
