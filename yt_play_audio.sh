@@ -17,8 +17,10 @@ read -p "Enter the YouTube title: " title
 
 # Get video metadata from yt-dlp
 metadata=$(yt-dlp -j --no-playlist "ytsearch:$title")
-url=$(echo "$metadata" | jq -r '.url')
-video_title=$(echo "$metadata" | jq -r '.title')
+
+# Extract URL and title correctly, handling array or object cases
+url=$(echo "$metadata" | jq -r 'if type=="array" then .[0].url else .url end')
+video_title=$(echo "$metadata" | jq -r 'if type=="array" then .[0].title else .title end')
 
 # Validate URL
 if [[ -z "$url" || "$url" == "null" ]]; then
