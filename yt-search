@@ -29,7 +29,7 @@ get_video_url() {
     return 1
   fi
 
-  local selection=$(echo "$results" | \
+  local selection=$(echo "$results" |
     jq -c '.' |
     fzf --height "40%" --reverse --header "Select video" --print0
   )
@@ -39,7 +39,7 @@ get_video_url() {
     return 1
   fi
 
-  local url=$(echo "$selection" | xargs -0 jq -r '.url')
+  local url=$({ echo "$selection" | xargs -0 jq -r '.url'; })
 
   echo "$url"
   return 0
