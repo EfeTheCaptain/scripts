@@ -16,7 +16,7 @@ fi
 read -p "Enter the YouTube title: " title
 
 # Get video metadata from yt-dlp
-metadata=$(yt-dlp -j --no-playlist "ytsearch:$title" | jq '.[0]')
+metadata=$(yt-dlp -j --no-playlist "ytsearch:$title")
 url=$(echo "$metadata" | jq -r '.url')
 video_title=$(echo "$metadata" | jq -r '.title')
 
