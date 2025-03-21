@@ -58,7 +58,10 @@ play_video() {
   local url="$1"
   if [[ -n "$url" ]]; then
     echo "Playing video..."
-    mpv --really-quiet --no-terminal "$url" &   # Play in background
+    if ! mpv --really-quiet --no-terminal "$url"; then
+      echo "Failed to play video." >&2
+      exit 1
+    fi
   fi
 }
 
