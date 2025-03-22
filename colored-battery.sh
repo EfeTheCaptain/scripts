@@ -59,7 +59,7 @@ for battery in /sys/class/power_supply/BAT?*; do
         # Print the battery information with colored icon
         echo -e "${color}${emoji}^d^ ${capacity}%"
     else
-        echo "Error: Could not read battery information from $battery"
+        echo "󱟩"
     fi
 done
 
