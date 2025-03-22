@@ -43,7 +43,8 @@ def get_prayer_times(url="https://namazvakitleri.diyanet.gov.tr/tr-TR/9543/kucuk
             remaining_time = f"Time left until {formatted_prayer_names[key]}: {str(time_left).split('.')[0]}"
             break
     
-    return f"{prayer_output}\n{hijri_date}\n{miladi_date}\n{remaining_time}"
+    notification_text = f"{prayer_output}\n{hijri_date}\n{miladi_date}\n\n{remaining_time}"
+    return notification_text
 
 if __name__ == "__main__":
     result = get_prayer_times()
