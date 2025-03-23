@@ -18,22 +18,15 @@ esac
 # Get the current volume from alsamixer
 vol="$(amixer get Master | grep -E -o '[0-9]*%' | head -n 1)"
 
-# If muted, print 🔇 and exit.
-if amixer get Master | grep -q '\[off\]'; then
-    echo "🔇"
-    pkill -RTMIN+10 "${STATUSBAR:-dwmblocks}"  # Refresh status bar when muted
-    exit
-fi
-
 # Clean up the volume value (remove % sign)
 vol="${vol%\%}"
 
 # Set icons based on volume levels
 case 1 in
-    $((vol >= 70)) ) icon="🔊" ;;  # Loud
-    $((vol >= 30)) ) icon="🔉" ;;  # Medium
-    $((vol >= 1)) ) icon="🔈" ;;   # Quiet
-    * ) icon="🔇" ;;        # Muted (though this case is already handled above)
+    $((vol >= 70)) ) icon="󰕾" ;;  # Loud
+    $((vol >= 30)) ) icon="󰖀" ;;  # Medium
+    $((vol >= 1)) ) icon="󰕿" ;;   # Quiet
+    * ) icon="󰖁" ;;        # Muted (though this case is already handled above)
 esac
 
 # Output the volume with the corresponding icon
