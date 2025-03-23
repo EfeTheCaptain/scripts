@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Prints the current volume or 🔇 if muted.
+# Prints the current volume or 󰖁 if muted.
 
 case $BLOCK_BUTTON in
     1) # Open alsamixer in the terminal
@@ -23,7 +23,7 @@ vol="${vol%\%}"
 
 # If muted, print 󰖁 and exit.
 if amixer get Master | grep -q '\[off\]'; then
-    echo "🔇"
+    echo "󰖁"
     pkill -RTMIN+10 "${STATUSBAR:-dwmblocks}"  # Refresh status bar when muted
     exit
 fi
