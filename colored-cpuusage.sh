@@ -38,9 +38,9 @@ done
 if [ "$max_usage" -le 5 ]; then
     color="^c#1f56b5^"
 elif [ "$max_usage" -le 10 ]; then
-    color="^c#26b51f^"
-elif [ "$max_usage" -le 20 ]; then
     color="^c#1fa4b5^"
+elif [ "$max_usage" -le 20 ]; then
+    color="^c#26b51f^"
 elif [ "$max_usage" -le 30 ]; then
     color="^c#1fb57e^"
 elif [ "$max_usage" -le 40 ]; then
