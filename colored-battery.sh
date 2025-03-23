@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # State tracking variables
-critical_notified=0
-low_notified=0
+critical_notified_file="/tmp/battery_critical_notified"
+low_notified_file="/tmp/battery_low_notified"
 
 get_charging_emoji() {
     local capacity=$1
@@ -35,17 +35,16 @@ for battery in /sys/class/power_supply/BAT?*; do
             Charging)
                 emoji=$(get_charging_emoji "$capacity")
                 #Reset notifications flags when charging
-                critical_notified=0
-                low_notified=0
+                rm -f "$critical_notified_file" "$low_notified_file"
                 ;;
             Discharging)
                 emoji=$(get_discharging_emoji "$capacity")
-                if [ "$capacity" -le 10 ] && [ "$critical_notified" -eq 0 ]; then
+                if [ "$capacity" -le 10 ] && [ ! -f "$critical_notified_file" ]; then
                     notify-send -u critical "Battery Critical" "Battery at ${capacity}%! Plug in now!"
-                    critical_notified=1
-                elif [ "$capacity" -le 20 ] && [ "$low_notified" -eq 0 ]; then
+                    touch "$critical_notified_file"
+                elif [ "$capacity" -le 20 ] && [ ! -f "$low_notified_file" ]; then
                     notify-send -u normal "Battery Low" "Battery at ${capacity}%!"
-                    low_notified=1
+                    touch "$low_notified_file"
                 fi
                 ;;
             Not\ charging)
