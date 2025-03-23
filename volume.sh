@@ -21,6 +21,12 @@ vol="$(amixer get Master | grep -E -o '[0-9]*%' | head -n 1)"
 # Clean up the volume value (remove % sign)
 vol="${vol%\%}"
 
+# If muted, print 󰖁 and exit.
+if amixer get Master | grep -q '\[off\]'; then
+    echo "🔇"
+    pkill -RTMIN+10 "${STATUSBAR:-dwmblocks}"  # Refresh status bar when muted
+    exit
+fi
 # Set icons based on volume levels
 case 1 in
     $((vol >= 70)) ) icon="󰕾" ;;  # Loud
