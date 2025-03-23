@@ -8,9 +8,9 @@ case $BLOCK_BUTTON in
     2) # Toggle mute
         amixer -q set Master toggle; pkill -RTMIN+10  ;;
     4) # Increase volume
-        amixer -q set Master 2%+; pkill -RTMIN+10  ;;
+        amixer -q set Master 4%+; pkill -RTMIN+10  ;;
     5) # Decrease volume
-        amixer -q set Master 3%-; pkill -RTMIN+10  ;;
+        amixer -q set Master 5%-; pkill -RTMIN+10  ;;
     6) # Edit this script with nvim in st terminal
         st -e nvim "$0" ;;
 esac
