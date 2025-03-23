@@ -4,19 +4,15 @@
 
 case $BLOCK_BUTTON in
     1) # Open alsamixer in the terminal
-        setsid -w -f "$TERMINAL" -e alsamixer; pkill -RTMIN+10 "${STATUSBAR:-dwmblocks}" ;;
+        st -e alsamixer; pkill -RTMIN+10  ;;
     2) # Toggle mute
-        amixer set Master toggle; pkill -RTMIN+10 "${STATUSBAR:-dwmblocks}" ;;
+        amixer -q set Master toggle; pkill -RTMIN+10  ;;
     4) # Increase volume
-        amixer set Master 1%+; pkill -RTMIN+10 "${STATUSBAR:-dwmblocks}" ;;
+        amixer -q set Master 2%+; pkill -RTMIN+10  ;;
     5) # Decrease volume
-        amixer set Master 1%-; pkill -RTMIN+10 "${STATUSBAR:-dwmblocks}" ;;
-    3) # Show notification
-        notify-send "📢 Volume module" "\- Shows volume 🔊, 🔇 if muted.
-- Middle click to mute.
-- Scroll to change." ;;
+        amixer -q set Master 3%-; pkill -RTMIN+10  ;;
     6) # Edit this script with nvim in st terminal
-        setsid -f "$TERMINAL" -e "$EDITOR" "$0" ;;
+        st -e nvim "$0" ;;
 esac
 
 # Get the current volume from alsamixer
