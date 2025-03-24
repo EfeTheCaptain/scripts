@@ -2,7 +2,7 @@
 
 # Function to list and select partitions using fzf
 select_partition() {
-  lsblk -nr -o NAME,SIZE,TYPE | awk '$3=="part"{print "/dev/"$1, "("$2")"}' | \
+  lsblk -nr -o NAME,SIZE,TYPE | awk '$3=="part" && $1 !~ /^sda/{print "/dev/"$1, "("$2")"}' | \
     fzf --height 40% --prompt "Select partition: " | awk '{print $1}'
 }
 
