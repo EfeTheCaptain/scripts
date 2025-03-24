@@ -1,69 +1,63 @@
 #!/bin/bash
 
-# Function to list and select devices using fzf
-select_device() {
-  lsblk -o NAME,SIZE,TYPE,MOUNTPOINT | grep -v "sda" | grep -v "loop" | fzf --height 40% --prompt "Select device: " | awk '{print $1}'
+# Function to list and select partitions using fzf
+select_partition() {
+  lsblk -nr -o NAME,SIZE,TYPE | awk '$3=="part"{print "/dev/"$1, "("$2")"}' | \
+    fzf --height 40% --prompt "Select partition: " | awk '{print $1}'
 }
 
 # Function to list and select mount points using fzf
 select_mountpoint() {
-  mount | grep "/media/" | awk '{print $3}' | fzf --height 40% --prompt "Select mount point: "
+  lsblk -nr -o MOUNTPOINT | grep -v '^$' | \
+    fzf --height 40% --prompt "Select mount point: "
 }
 
 # Loop for the menu
 while true
 do
-  echo "1. Mount a device"
-  echo "2. Unmount a device"
+  echo "1. Mount a partition"
+  echo "2. Unmount a partition"
   echo "3. Exit"
-  echo "Enter your choice: "
+  echo -n "Enter your choice: "
   read ch
 
   case $ch in
     1)
-      # List available devices with lsblk using fzf
-      echo "Listing available devices:"
-      DEVPATH=$(select_device)
+      echo "Listing available partitions:"
+      PARTITION=$(select_partition)
 
-      if [ -z "$DEVPATH" ]; then
-        echo "No device selected."
+      if [ -z "$PARTITION" ]; then
+        echo "No partition selected."
         continue
       fi
 
-      # Check if the device exists
-      if [ ! -b "$DEVPATH" ]; then
-        echo "Device $DEVPATH not found."
+      if [ ! -b "$PARTITION" ]; then
+        echo "Partition $PARTITION not found."
         continue
       fi
 
-      # Show contents of /media
-      echo "Contents of /media: "
+      echo "Contents of /media:"
       ls /media/
 
-      # Ask for mount point
-      echo "Enter a mount point name (e.g., usb): "
+      echo -n "Enter a mount point name (e.g., usb): "
       read MNTPT_NAME
-
       MNTPT="/media/$MNTPT_NAME"
 
-      # Create mount point if it doesn't exist
-      if [ ! -d "$MNTPT" ]; then
-        echo "Mount point doesn't exist. Creating directory $MNTPT"
-        sudo mkdir -p "$MNTPT"
+      if mountpoint -q "$MNTPT"; then
+        echo "Error: $MNTPT is already mounted."
+        continue
       fi
 
-      # Mount the device
-      sudo mount "$DEVPATH" "$MNTPT"
-      if [ $? -eq 0 ]; then
-        echo "Device mounted at $MNTPT"
-      else
-        echo "Mount failed."
+      if [ ! -d "$MNTPT" ]; then
+        echo "Mount point doesn't exist. Creating directory $MNTPT"
+        sudo mkdir -p "$MNTPT" || { echo "Failed to create mount point directory."; continue; }
       fi
+
+      sudo mount "$PARTITION" "$MNTPT" && echo "Partition mounted at $MNTPT" || echo "Mount failed."
       ;;
 
     2)
-      # Unmount using fzf
-      echo "Mounted devices under /media:"
+      echo "Mounted partitions:"
       MNTPT=$(select_mountpoint)
 
       if [ -z "$MNTPT" ]; then
@@ -71,21 +65,15 @@ do
         continue
       fi
 
-      # Unmount the device
-      if mountpoint -q "$MNTPT"; then
-        sudo umount "$MNTPT"
-        if [ $? -eq 0 ]; then
-          echo "Device unmounted from $MNTPT"
-        else
-          echo "Unmount failed."
-        fi
-      else
-        echo "Error: $MNTPT is not a mounted device."
+      if ! mountpoint -q "$MNTPT"; then
+        echo "Error: $MNTPT is not a mounted partition."
+        continue
       fi
+
+      sudo umount "$MNTPT" && echo "Partition unmounted from $MNTPT" || echo "Unmount failed."
       ;;
 
     3)
-      # Exit the script
       echo "Exiting..."
       exit
       ;;
