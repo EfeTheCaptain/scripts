@@ -9,4 +9,4 @@ case $BLOCK_BUTTON in
 	6) st -e nvim "$0" ;;
 esac
 
-free --mebi | sed -n '2{p;q}' | awk '{printf ("  %dMB/%.0fGB\n", $3, ($2 / 1024))}'
+free --mebi | sed -n '2{p;q}' | awk '{printf ("^c#3a7984^ ^d^ %dMB/%.0fGB\n", $3, ($2 / 1024))}'
