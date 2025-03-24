@@ -8,7 +8,7 @@ select_partition() {
 
 # Function to list and select mount points using fzf
 select_mountpoint() {
-  lsblk -nr -o MOUNTPOINT,SIZE,TYPE | awk '$2!="SWAP" && $1!="[SWAP]" && $1!="/home" && $1!="/" {print $1}' | \
+  lsblk -nr -o MOUNTPOINT,SIZE,TYPE | awk '$2!="SWAP" && $1!="[SWAP]" && $1!="/home" && $1!="/" && $1!="/root" {print $1}' | \
     grep -v '^$' | \
     fzf --height 40% --prompt "Select mount point: "
 }
