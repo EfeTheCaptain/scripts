@@ -1,7 +1,9 @@
 #!/bin/sh
 
+#interface device
+device=wlan0
 # Get the signal strength (RSSI) using sudo iw
-signal=$(sudo iw dev wlan0 link | grep -i signal | awk '{print $2}')
+signal=$(sudo iw dev "$device" link | grep -i signal | awk '{print $2}')
 
 # Check if connected
 if [ -z "$signal" ]; then
@@ -25,14 +27,14 @@ else
 fi
 case $BLOCK_BUTTON in
   1)
-    ssid=$(sudo iw dev "$interface" link | grep SSID | awk '{print $2}')
-    local_ip=$(ip a show "$interface" | grep "inet " | awk '{print $2}')
+    ssid=$(sudo iw dev "$device" link | grep SSID | awk '{print $2}')
+    local_ip=$(ip a show "$device" | grep "inet " | awk '{print $2}')
     firewall_status=$(sudo ufw status | grep "Status:" | awk '{print $2}')
     notify-send "📶 $ssid" "Quality: $quality%\nLocal IP: $local_ip\nFirewall: $firewall_status"
     ;;
   2)
     public_ip=$(curl -s ifconfig.me)
-    mac_address=$(ip link show "$interface" | awk '/link\/ether/ {print $2}')
+    mac_address=$(ip link show "$device" | awk '/link\/ether/ {print $2}')
     dns_servers=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}' | tr '\n' ' ')
     gateway_ip=$(ip route | grep default | awk '{print $3}')
     notify-send "🌐 Network Details" "Public IP: $public_ip\nMAC: $mac_address\nDNS: $dns_servers\nGateway: $gateway_ip"
