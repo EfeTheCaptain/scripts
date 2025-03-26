@@ -3,3 +3,6 @@ yt
 yt-search
 yt-dlp
 youtube-dl
+wal
+*.old
+*.bak
