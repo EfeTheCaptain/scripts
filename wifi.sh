@@ -1,8 +1,11 @@
 #!/bin/sh
-
-#interface device
+#Variables
+USER=efe
+TERMINAL=st
+EDITOR=nvim
+WPACONFLOC=/etc/wpa_supplicant/wpa_supplicant.conf
+NETWORKSTARTUPLOC=/home/$USER/.config/system/network-startup.sh
 device=wlan0
-# Get the signal strength (RSSI) using sudo iw
 signal=$(sudo iw dev "$device" link | grep -i signal | awk '{print $2}')
 
 # Check if connected
@@ -26,20 +29,24 @@ else
     fi
 fi
 case $BLOCK_BUTTON in
-  1)
-    ssid=$(sudo iw dev "$device" link | grep SSID | awk '{print $2}')
-    local_ip=$(ip a show "$device" | grep "inet " | awk '{print $2}')
-    firewall_status=$(sudo ufw status | grep "Status:" | awk '{print $2}')
-    notify-send "📶 $ssid" "Quality: $quality%\nLocal IP: $local_ip\nFirewall: $firewall_status"
-    ;;
-  2)
-    public_ip=$(curl -s ifconfig.me)
-    mac_address=$(ip link show "$device" | awk '/link\/ether/ {print $2}')
-    dns_servers=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}' | tr '\n' ' ')
-    gateway_ip=$(ip route | grep default | awk '{print $3}')
-    notify-send "🌐 Network Details" "Public IP: $public_ip\nMAC: $mac_address\nDNS: $dns_servers\nGateway: $gateway_ip"
-    ;;
-  6) st -e nvim "$0" ;;
+    1)
+        ssid=$(sudo iw dev "$device" link | grep SSID | awk '{print $2}')
+        local_ip=$(ip a show "$device" | grep "inet " | awk '{print $2}')
+        public_ip=$(curl -s ifconfig.me)
+        mac_address=$(ip link show "$device" | awk '/link\/ether/ {print $2}')
+        firewall_status=$(sudo ufw status | grep "Status:" | awk '{print $2}')
+        dns_servers=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}' | tr '\n' ' ')
+        notify-send "🌐 Network Details" "$ssid\nQuality:$quality%\nLocal-IP:$local_ip\nPublic IP:$public_ip\nMAC:$mac_address\nFirewall:$firewall_status\nDNS:$dns_servers"
+        ;;
+    2)
+        "$TERMINAL" -e "$EDITOR" "$NETWORKSTARTUPLOC"
+        ;;
+    3)
+        "$TERMINAL" -e sudo "$EDITOR" "$WPACONFLOC"
+        ;;
+    6)
+        "$TERMINAL" -e "$EDITOR" "$0"
+        ;;
 esac
 
 # Print the final icon only
