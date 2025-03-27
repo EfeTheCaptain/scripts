@@ -6,7 +6,7 @@ low_notified_file="/tmp/battery_low_notified"
 high_notified_file="/tmp/battery_high_notified"
 urgent_sound_file="/home/$USER/audio/bell-meme.wav"
 low_sound_file="/home/$USER/audio/soft-alert.wav"
-high_sound_file="home/$USER/audio/ui-pop.wav"
+high_sound_file="/home/$USER/audio/ui-pop.wav"
 
 get_charging_emoji() {
     local capacity=$1
