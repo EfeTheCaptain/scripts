@@ -4,6 +4,9 @@
 critical_notified_file="/tmp/battery_critical_notified"
 low_notified_file="/tmp/battery_low_notified"
 high_notified_file="/tmp/battery_high_notified"
+urgent_sound_file="/home/$USER/audio/bell-meme.wav"
+low_sound_file="/home/$USER/audio/soft-alert.wav"
+high_sound_file="home/$USER/audio/ui-pop.wav"
 
 get_charging_emoji() {
     local capacity=$1
@@ -40,6 +43,7 @@ for battery in /sys/class/power_supply/BAT?*; do
                 # Notify when battery reaches 80% while charging
                 if [ "$capacity" -ge 80 ] && [ ! -f "$high_notified_file" ]; then
                     notify-send -u normal "Battery Full Enough" "Battery at ${capacity}%, consider unplugging!"
+                    aplay "$high_sound_file"
                     touch "$high_notified_file"
                 fi
                 ;;
@@ -47,9 +51,11 @@ for battery in /sys/class/power_supply/BAT?*; do
                 emoji=$(get_discharging_emoji "$capacity")
                 if [ "$capacity" -le 10 ] && [ ! -f "$critical_notified_file" ]; then
                     notify-send -u critical "Battery Critical" "Battery at ${capacity}%! Plug in now!"
+                    aplay "$urgent_sound_file"
                     touch "$critical_notified_file"
                 elif [ "$capacity" -le 20 ] && [ ! -f "$low_notified_file" ]; then
                     notify-send -u normal "Battery Low" "Battery at ${capacity}%!"
+                    aplay "$low_sound_file"
                     touch "$low_notified_file"
                 fi
                 rm -f "$high_notified_file"  # Reset high notification when discharging
