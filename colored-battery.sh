@@ -3,6 +3,7 @@
 # State tracking variables
 critical_notified_file="/tmp/battery_critical_notified"
 low_notified_file="/tmp/battery_low_notified"
+high_notified_file="/tmp/battery_high_notified"
 
 get_charging_emoji() {
     local capacity=$1
@@ -34,8 +35,13 @@ for battery in /sys/class/power_supply/BAT?*; do
         case "$status" in
             Charging)
                 emoji=$(get_charging_emoji "$capacity")
-                #Reset notifications flags when charging
                 rm -f "$critical_notified_file" "$low_notified_file"
+        
+                # Notify when battery reaches 80% while charging
+                if [ "$capacity" -ge 80 ] && [ ! -f "$high_notified_file" ]; then
+                    notify-send -u normal "Battery Full Enough" "Battery at ${capacity}%, consider unplugging!"
+                    touch "$high_notified_file"
+                fi
                 ;;
             Discharging)
                 emoji=$(get_discharging_emoji "$capacity")
@@ -46,6 +52,7 @@ for battery in /sys/class/power_supply/BAT?*; do
                     notify-send -u normal "Battery Low" "Battery at ${capacity}%!"
                     touch "$low_notified_file"
                 fi
+                rm -f "$high_notified_file"  # Reset high notification when discharging
                 ;;
             Not\ charging)
                 emoji="󰂃" # Not charging
