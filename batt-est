@@ -88,6 +88,64 @@ calculate_estimate() {
         
         if is_charging; then
             echo "Battery is charging."
+# Function to calculate and print estimated time
+calculate_estimate() {
+    if [ ! -f "$DATA_FILE" ]; then
+        echo "No data available."
+        return
+    fi
+    
+    local current_time=$(get_timestamp)
+    local current_percentage=$(get_battery_percentage)
+    local acpi_remaining_minutes=$(get_acpi_remaining_minutes)
+    
+    # Check if current_percentage and acpi_remaining_minutes are valid
+    if ! is_valid_number "$current_percentage" || [ "$current_percentage" == "N/A" ]; then
+        echo "Invalid battery percentage."
+        return
+    fi
+
+    if ! is_valid_number "$acpi_remaining_minutes" || [ "$acpi_remaining_minutes" == "N/A" ]; then
+        echo "Invalid ACPI remaining time."
+        return
+    fi
+
+    local short_term_rate=0.0
+    local short_term_percentage_change=0.0
+    local short_term_elapsed_time=0
+    local prev_timestamp=""
+    local prev_percentage=""
+    
+    while IFS=',' read -r timestamp percentage; do
+        if [ -n "$prev_timestamp" ] && [ "$percentage" != "N/A" ] && [ "$prev_percentage" != "N/A" ]; then
+            local elapsed_time=$((timestamp - prev_timestamp))
+            local percentage_change=$((prev_percentage - percentage))
+            
+            if [ "$elapsed_time" -gt 0 ] && [ "$percentage_change" -gt 0 ] && [ $((current_time - timestamp)) -le $SHORT_TERM_WINDOW ]; then
+                short_term_rate=$(echo "scale=4; $percentage_change / $elapsed_time" | bc)
+                short_term_percentage_change=$percentage_change
+                short_term_elapsed_time=$((current_time - timestamp))
+            fi
+        fi
+        prev_timestamp=$timestamp
+        prev_percentage=$percentage
+    done < "$DATA_FILE"
+
+    # Validate short_term_rate before proceeding
+    if ! is_valid_number "$short_term_rate" || [ "$short_term_rate" == "0" ]; then
+        echo "Invalid short-term rate: $short_term_rate."
+        return
+    fi
+
+    if [ "$(echo "$short_term_rate > 0" | bc -l)" -eq 1 ] && [ "$acpi_remaining_minutes" != "N/A" ]; then
+        local short_term_remaining_minutes=$(echo "scale=0; $current_percentage / $short_term_rate / 60" | bc)
+        local experienced_weight=$(echo "scale=4; (100 - $ACPI_WEIGHT * 100) / 100" | bc)
+        local combined_remaining_minutes=$(echo "scale=0; ($short_term_remaining_minutes * $experienced_weight) + ($acpi_remaining_minutes * $ACPI_WEIGHT)" | bc)
+        local remaining_hours=$((combined_remaining_minutes / 60))
+        local remaining_minutes=$((combined_remaining_minutes % 60))
+        
+        if is_charging; then
+            echo "Battery is charging."
         else
             echo "Estimated remaining time: $remaining_hours hours and $remaining_minutes minutes"
             printf "%s,%s,%s\n" "$current_time" "$current_percentage" "$combined_remaining_minutes" >> "$HOME/estimation_data.csv"
@@ -102,6 +160,7 @@ calculate_estimate() {
         fi
     fi
 }
+
 
 # Function to adjust the ACPI weight
 adjust_acpi_weight() {
