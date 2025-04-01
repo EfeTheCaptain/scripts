@@ -26,6 +26,11 @@ get_acpi_remaining_minutes() {
     acpi -b | grep -oP "([0-9]+):([0-9]+)" | awk -F":" '{print ($1*60)+$2}' || echo "N/A"
 }
 
+# Function to check if a value is a valid number
+is_valid_number() {
+    [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]]
+}
+
 # Function to calculate and print estimated time
 calculate_estimate() {
     if [ ! -f "$DATA_FILE" ]; then
@@ -97,7 +102,6 @@ calculate_estimate() {
         fi
     fi
 }
-
 
 # Function to adjust the ACPI weight
 adjust_acpi_weight() {
