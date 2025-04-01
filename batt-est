@@ -77,7 +77,7 @@ calculate_estimate() {
 }
 
 #Function to adjust the acpi weight.
-adjust_acpi_weight(){
+adjust_acpi_weight() {
     local estimation_data="$HOME/estimation_data.csv"
     if [ ! -f "$estimation_data" ]; then
         return
@@ -87,11 +87,14 @@ adjust_acpi_weight(){
     local last_estimate_percentage=""
     local last_estimate_minutes=""
     while IFS=',' read -r time percentage minutes; do
-        last_estimate_time="$time"
-        last_estimate_percentage="$percentage"
-        last_estimate_minutes="$minutes"
+        if [[ "$time" =~ ^[0-9]+$ ]]; then # Check if 'time' is a valid integer
+            last_estimate_time="$time"
+            last_estimate_percentage="$percentage"
+            last_estimate_minutes="$minutes"
+        fi
     done < "$estimation_data"
-    if [ -n "$last_estimate_time" ]; then
+
+    if [ -n "$last_estimate_time" ] && [[ "$current_time" =~ ^[0-9]+$ ]]; then # Check if both are valid integers
         local elapsed_time=$((current_time - last_estimate_time))
         local current_percentage=$(get_battery_percentage)
         local expected_percentage=$(echo "scale=4; $last_estimate_percentage - ($elapsed_time / 60.0) * ($last_estimate_percentage / $last_estimate_minutes)" | bc)
@@ -104,6 +107,7 @@ adjust_acpi_weight(){
         fi
     fi
 }
+
 
 #Function to record battery percentage and time.
 record_battery_model(){
