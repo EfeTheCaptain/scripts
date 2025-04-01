@@ -32,16 +32,22 @@ calculate_estimate() {
         echo "No data available."
         return
     fi
+    
     local current_time=$(get_timestamp)
-    local short_term_rate=0
-    local short_term_percentage_change=0
+    local current_percentage=$(get_battery_percentage)
+    local acpi_remaining_minutes=$(get_acpi_remaining_minutes)
+    
+    local short_term_rate=0.0
+    local short_term_percentage_change=0.0
     local short_term_elapsed_time=0
     local prev_timestamp=""
     local prev_percentage=""
+    
     while IFS=',' read -r timestamp percentage; do
         if [ -n "$prev_timestamp" ] && [ "$percentage" != "N/A" ] && [ "$prev_percentage" != "N/A" ]; then
             local elapsed_time=$((timestamp - prev_timestamp))
             local percentage_change=$((prev_percentage - percentage))
+            
             if [ "$elapsed_time" -gt 0 ] && [ "$percentage_change" -gt 0 ] && [ $((current_time - timestamp)) -le $SHORT_TERM_WINDOW ]; then
                 short_term_rate=$(echo "scale=4; $percentage_change / $elapsed_time" | bc)
                 short_term_percentage_change=$percentage_change
@@ -51,84 +57,93 @@ calculate_estimate() {
         prev_timestamp=$timestamp
         prev_percentage=$percentage
     done < "$DATA_FILE"
-    local current_percentage=$(get_battery_percentage)
-    local acpi_remaining_minutes=$(get_acpi_remaining_minutes)
-    if [ "$current_percentage" != "N/A" ] && (( $(echo "$short_term_rate > 0" | bc -l) )) && [ "$acpi_remaining_minutes" != "N/A" ]; then
+
+    if [ "$current_percentage" != "N/A" ] && [ "$(echo "$short_term_rate > 0" | bc -l)" -eq 1 ] && [ "$acpi_remaining_minutes" != "N/A" ]; then
         local short_term_remaining_minutes=$(echo "scale=0; $current_percentage / $short_term_rate / 60" | bc)
-        local experienced_weight=$((100-$ACPI_WEIGHT*100))/100.0
+        local experienced_weight=$(echo "scale=4; (100 - $ACPI_WEIGHT * 100) / 100" | bc)
         local combined_remaining_minutes=$(echo "scale=0; ($short_term_remaining_minutes * $experienced_weight) + ($acpi_remaining_minutes * $ACPI_WEIGHT)" | bc)
         local remaining_hours=$((combined_remaining_minutes / 60))
         local remaining_minutes=$((combined_remaining_minutes % 60))
+        
         if is_charging; then
             echo "Battery is charging."
         else
             echo "Estimated remaining time: $remaining_hours hours and $remaining_minutes minutes"
-            echo "$current_time,$current_percentage,$combined_remaining_minutes" >> "$HOME/estimation_data.csv"
+            printf "%s,%s,%s\n" "$current_time" "$current_percentage" "$combined_remaining_minutes" >> "$HOME/estimation_data.csv"
         fi
     else
         if [ "$acpi_remaining_minutes" != "N/A" ] && is_charging; then
             echo "Battery is charging."
         elif [ "$acpi_remaining_minutes" != "N/A" ]; then
-            echo "Estimated remaining time: $(($acpi_remaining_minutes / 60)) hours and $(( $acpi_remaining_minutes % 60)) minutes (ACPI based)"
+            echo "Estimated remaining time: $(($acpi_remaining_minutes / 60)) hours and $(($acpi_remaining_minutes % 60)) minutes (ACPI based)"
         else
             echo "Unable to calculate remaining time."
         fi
     fi
 }
 
-#Function to adjust the acpi weight.
+# Function to adjust the ACPI weight
 adjust_acpi_weight() {
     local estimation_data="$HOME/estimation_data.csv"
     if [ ! -f "$estimation_data" ]; then
         return
     fi
+    
     local current_time=$(get_timestamp)
+    local current_percentage=$(get_battery_percentage)
     local last_estimate_time=""
     local last_estimate_percentage=""
     local last_estimate_minutes=""
+    
     while IFS=',' read -r time percentage minutes; do
-        if [[ "$time" =~ ^[0-9]+$ ]]; then # Check if 'time' is a valid integer
+        if [[ "$time" =~ ^[0-9]+$ ]]; then
             last_estimate_time="$time"
             last_estimate_percentage="$percentage"
             last_estimate_minutes="$minutes"
         fi
     done < "$estimation_data"
 
-    if [ -n "$last_estimate_time" ] && [[ "$current_time" =~ ^[0-9]+$ ]]; then # Check if both are valid integers
+    if [ -n "$last_estimate_time" ] && [[ "$current_time" =~ ^[0-9]+$ ]] && [ "$current_percentage" != "N/A" ]; then
         local elapsed_time=$((current_time - last_estimate_time))
-        local current_percentage=$(get_battery_percentage)
         local expected_percentage=$(echo "scale=4; $last_estimate_percentage - ($elapsed_time / 60.0) * ($last_estimate_percentage / $last_estimate_minutes)" | bc)
         local percentage_error=$(echo "scale=4; $current_percentage - $expected_percentage" | bc)
+        
         ACPI_WEIGHT=$(echo "scale=4; $ACPI_WEIGHT + ($percentage_error * $ADJUSTMENT_FACTOR)" | bc)
-        if (( $(echo "$ACPI_WEIGHT < 0" | bc -l) )); then
+        
+        # Ensure weight stays between 0 and 1
+        if [ $(echo "$ACPI_WEIGHT < 0" | bc) -eq 1 ]; then
             ACPI_WEIGHT=0.0
-        elif (( $(echo "$ACPI_WEIGHT > 1" | bc -l) )); then
+        elif [ $(echo "$ACPI_WEIGHT > 1" | bc) -eq 1 ]; then
             ACPI_WEIGHT=1.0
         fi
     fi
 }
 
-
-#Function to record battery percentage and time.
-record_battery_model(){
+# Function to record battery percentage and time
+record_battery_model() {
     local current_percentage=$(get_battery_percentage)
     local current_time=$(get_timestamp)
-    echo "$current_percentage,$current_time" >> "$MODEL_FILE"
+    if [ "$current_percentage" != "N/A" ]; then
+        printf "%s,%s\n" "$current_percentage" "$current_time" >> "$MODEL_FILE"
+    fi
 }
 
 # Main loop
 while true; do
     timestamp=$(get_timestamp)
     percentage=$(get_battery_percentage)
+    
     if [ "$percentage" != "N/A" ]; then
-        echo "$timestamp,$percentage" >> "$DATA_FILE"
+        printf "%s,%s\n" "$timestamp" "$percentage" >> "$DATA_FILE"
         record_battery_model
     fi
 
     # Prune data (keep last 1000 entries)
-    line_count=$(wc -l < "$DATA_FILE")
-    if [ "$line_count" -gt 1000 ]; then
-        tail -n 1000 "$DATA_FILE" > "$DATA_FILE.tmp" && mv -f "$DATA_FILE.tmp" "$DATA_FILE" && sync
+    if [ -f "$DATA_FILE" ]; then
+        line_count=$(wc -l < "$DATA_FILE")
+        if [ "$line_count" -gt 1000 ]; then
+            tail -n 1000 "$DATA_FILE" > "$DATA_FILE.tmp" && mv -f "$DATA_FILE.tmp" "$DATA_FILE"
+        fi
     fi
 
     adjust_acpi_weight
