@@ -53,7 +53,7 @@ calculate_estimate() {
     done < "$DATA_FILE"
     local current_percentage=$(get_battery_percentage)
     local acpi_remaining_minutes=$(get_acpi_remaining_minutes)
-    if [ "$current_percentage" != "N/A" ] && [ "$short_term_rate" -gt 0 ] && [ "$acpi_remaining_minutes" != "N/A" ]; then
+    if [ "$current_percentage" != "N/A" ] && (( $(echo "$short_term_rate > 0" | bc -l) )) && [ "$acpi_remaining_minutes" != "N/A" ]; then
         local short_term_remaining_minutes=$(echo "scale=0; $current_percentage / $short_term_rate / 60" | bc)
         local experienced_weight=$((100-$ACPI_WEIGHT*100))/100.0
         local combined_remaining_minutes=$(echo "scale=0; ($short_term_remaining_minutes * $experienced_weight) + ($acpi_remaining_minutes * $ACPI_WEIGHT)" | bc)
@@ -120,10 +120,13 @@ while true; do
         echo "$timestamp,$percentage" >> "$DATA_FILE"
         record_battery_model
     fi
+
+    # Prune data (keep last 1000 entries)
     line_count=$(wc -l < "$DATA_FILE")
-    if [ "$line_count" -gt 100 ]; then
-        tail -n 100 "$DATA_FILE" > "$DATA_FILE.tmp" && mv -f "$DATA_FILE.tmp" "$DATA_FILE" && sync
+    if [ "$line_count" -gt 1000 ]; then
+        tail -n 1000 "$DATA_FILE" > "$DATA_FILE.tmp" && mv -f "$DATA_FILE.tmp" "$DATA_FILE" && sync
     fi
+
     adjust_acpi_weight
     calculate_estimate
     sleep 30
