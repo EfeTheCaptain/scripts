@@ -37,6 +37,17 @@ calculate_estimate() {
     local current_percentage=$(get_battery_percentage)
     local acpi_remaining_minutes=$(get_acpi_remaining_minutes)
     
+    # Check if current_percentage and acpi_remaining_minutes are valid
+    if ! is_valid_number "$current_percentage" || [ "$current_percentage" == "N/A" ]; then
+        echo "Invalid battery percentage."
+        return
+    fi
+
+    if ! is_valid_number "$acpi_remaining_minutes" || [ "$acpi_remaining_minutes" == "N/A" ]; then
+        echo "Invalid ACPI remaining time."
+        return
+    fi
+
     local short_term_rate=0.0
     local short_term_percentage_change=0.0
     local short_term_elapsed_time=0
@@ -58,7 +69,12 @@ calculate_estimate() {
         prev_percentage=$percentage
     done < "$DATA_FILE"
 
-    if [ "$current_percentage" != "N/A" ] && [ "$(echo "$short_term_rate > 0" | bc -l)" -eq 1 ] && [ "$acpi_remaining_minutes" != "N/A" ]; then
+    if ! is_valid_number "$short_term_rate" || [ "$short_term_rate" == "0" ]; then
+        echo "Invalid short-term rate."
+        return
+    fi
+
+    if [ "$(echo "$short_term_rate > 0" | bc -l)" -eq 1 ] && [ "$acpi_remaining_minutes" != "N/A" ]; then
         local short_term_remaining_minutes=$(echo "scale=0; $current_percentage / $short_term_rate / 60" | bc)
         local experienced_weight=$(echo "scale=4; (100 - $ACPI_WEIGHT * 100) / 100" | bc)
         local combined_remaining_minutes=$(echo "scale=0; ($short_term_remaining_minutes * $experienced_weight) + ($acpi_remaining_minutes * $ACPI_WEIGHT)" | bc)
@@ -81,6 +97,7 @@ calculate_estimate() {
         fi
     fi
 }
+
 
 # Function to adjust the ACPI weight
 adjust_acpi_weight() {
