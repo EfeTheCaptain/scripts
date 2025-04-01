@@ -1,0 +1,93 @@
+#!/bin/bash
+
+DATA_FILE="$HOME/battery_data.csv"
+
+# Function to get battery percentage
+get_battery_percentage() {
+  acpi -b | grep -oP '[0-9]+(?=%)' || echo "N/A"
+}
+
+# Function to get charging status
+is_charging() {
+  acpi -b | grep -q "Charging"
+}
+
+# Function to get current timestamp
+get_timestamp() {
+  date +%s
+}
+
+# Function to calculate and print estimated time
+calculate_estimate() {
+  if [ ! -f "$DATA_FILE" ]; then
+    echo "No data available."
+    return
+  fi
+
+  local total_rate=0
+  local count=0
+  local prev_timestamp=""
+  local prev_percentage=""
+
+  while IFS=',' read -r timestamp percentage; do
+    if [ -n "$prev_timestamp" ] && [ "$percentage" != "N/A" ] && [ "$prev_percentage" != "N/A" ]; then
+      local elapsed_time=$((timestamp - prev_timestamp))
+      local percentage_change=$((prev_percentage - percentage))
+
+      if [ "$elapsed_time" -gt 0 ] && [ "$percentage_change" -gt 0 ]; then
+        local rate=$(echo "scale=4; $percentage_change / $elapsed_time" | bc)
+        total_rate=$(echo "$total_rate + $rate" | bc)
+        count=$((count + 1))
+      fi
+    fi
+    prev_timestamp=$timestamp
+    prev_percentage=$percentage
+  done < "$DATA_FILE"
+
+  if [ "$count" -gt 0 ]; then
+    local average_rate=$(echo "scale=4; $total_rate / $count" | bc)
+
+    if (( $(echo "$average_rate > 0" | bc -l) )); then
+      local current_percentage=$(get_battery_percentage)
+      
+      if [ "$current_percentage" != "N/A" ]; then
+        local remaining_seconds=$(echo "scale=0; $current_percentage / $average_rate" | bc)
+        local remaining_minutes=$((remaining_seconds / 60))
+        local remaining_hours=$((remaining_minutes / 60))
+        local remaining_minutes=$((remaining_minutes % 60))
+        
+        if is_charging; then
+          echo "Battery is charging."
+        else
+          echo "Estimated remaining time: $remaining_hours hours and $remaining_minutes minutes"
+        fi
+      else
+        echo "Unable to fetch current battery percentage."
+      fi
+    else
+      echo "Insufficient data for estimation."
+    fi
+  else
+    echo "Insufficient data for estimation."
+  fi
+}
+
+# Main loop
+while true; do
+  timestamp=$(get_timestamp)
+  percentage=$(get_battery_percentage)
+
+  if [ "$percentage" != "N/A" ]; then
+    echo "$timestamp,$percentage" >> "$DATA_FILE"
+  fi
+
+  # Prune data (keep last 100 entries)
+  line_count=$(wc -l < "$DATA_FILE")
+  if [ "$line_count" -gt 100 ]; then
+    tail -n 100 "$DATA_FILE" > "$DATA_FILE.tmp" && mv -f "$DATA_FILE.tmp" "$DATA_FILE" && sync
+  fi
+
+  calculate_estimate
+
+  sleep 60 # Collect data every minute
+done
