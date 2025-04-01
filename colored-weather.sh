@@ -43,8 +43,13 @@ message="Location: $location\nCondition: $icon$condition\nTemperature: $temperat
 
 # Handle clicks
 case $BLOCK_BUTTON in
-    1)
+	1)
+  	aplay /home/efe/audio/ss-click.wav
         timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-        notify-send "Weather" "$message\nLast Checked: $timestamp" ;;  # Left-click → Notification with timestamp
-    6) st -e nvim "$0" ;;  # Middle-click → Edit script
+        notify-send "Weather" "$message\nLast Checked: $timestamp" ;;  
+   
+
+	6)  aplay /home/efe/audio/ss-click.wav 
+	st -e nvim "$0" ;;  # Middle-click → Edit script
+
 esac

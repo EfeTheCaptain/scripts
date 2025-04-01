@@ -53,7 +53,7 @@ def get_prayer_times(url="https://namazvakitleri.diyanet.gov.tr/tr-TR/9543/kucuk
         time_left = imsak_time - now
         remaining_time = f"Time left until {formatted_prayer_names['imsak']} (Tomorrow): {str(time_left).split('.')[0]}"
 
-    notification_text = f"{prayer_output}\n{hijri_date}\n{miladi_date}\n\n{remaining_time}"
+    notification_text = f"{prayer_output}\n\n{hijri_date}\n{miladi_date}\n\n{remaining_time}"
     return notification_text
 
 if __name__ == "__main__":
