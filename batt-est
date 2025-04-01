@@ -1,43 +1,31 @@
 #!/bin/bash
 
-# Automatic Battery Monitor
-# Continuously tracks and predicts battery time remaining
+# Battery Predictor with 10% Milestones
+# Requires: jq (for JSON processing)
 
-# Configuration
 LOG_FILE="$HOME/.battery_history"
 PREDICTION_FILE="$HOME/.battery_prediction"
-UPDATE_INTERVAL=60  # Seconds between updates
-LOG_LIMIT=500       # Maximum lines to keep in log file
+UPDATE_INTERVAL=60
+MILESTONE_STEP=10
 
-# Initialize files
 init_files() {
     [ ! -f "$LOG_FILE" ] && touch "$LOG_FILE"
-    [ ! -f "$PREDICTION_FILE" ] && echo "Calculating..." > "$PREDICTION_FILE"
+    [ ! -f "$PREDICTION_FILE" ] && echo '{"status":"init"}' > "$PREDICTION_FILE"
 }
 
-# Find battery path
 find_battery() {
     for battery in /sys/class/power_supply/BAT*; do
         [ -d "$battery" ] && echo "$battery" && return
     done
-    echo "ERROR: No battery found" >&2
+    echo "No battery found" >&2
     exit 1
 }
 
-# Get current battery info
 get_battery_info() {
     local battery=$(find_battery)
     echo "$(cat "$battery/capacity"),$(cat "$battery/status"),$(date +%s)"
 }
 
-# Maintain log size
-rotate_log() {
-    [ $(wc -l < "$LOG_FILE") -gt $LOG_LIMIT ] && \
-        tail -n $LOG_LIMIT "$LOG_FILE" > "$LOG_FILE.tmp" && \
-        mv "$LOG_FILE.tmp" "$LOG_FILE"
-}
-
-# Record battery state if changed
 record_state() {
     local current_info=$(get_battery_info)
     local current_percent=$(echo "$current_info" | cut -d',' -f1)
@@ -47,65 +35,53 @@ record_state() {
        [ "$current_percent" != "$(echo "$last_line" | cut -d',' -f1)" ] || \
        [ "$(echo "$current_info" | cut -d',' -f2)" != "$(echo "$last_line" | cut -d',' -f2)" ]; then
         echo "$current_info" >> "$LOG_FILE"
-        rotate_log
     fi
 }
 
-# Format seconds into readable time
 format_time() {
     local seconds=$1
-    local hours=$((seconds / 3600))
-    local minutes=$(( (seconds % 3600) / 60 ))
-    [ "$hours" -gt 0 ] && echo "${hours}h ${minutes}m" || echo "${minutes}m"
+    [ "$seconds" -lt 60 ] && echo "<1m" && return
+    local minutes=$(( (seconds + 30) / 60 ))  # Round to nearest minute
+    echo "${minutes}m"
 }
 
-# Calculate time estimate
-calculate_estimate() {
+calculate_milestones() {
     local current_info=$(get_battery_info)
     local current_percent=$(echo "$current_info" | cut -d',' -f1)
     local status=$(echo "$current_info" | cut -d',' -f2)
-    local now=$(echo "$current_info" | cut -d',' -f3)
     local entries=$(grep ",$status," "$LOG_FILE" | tail -n 5)
 
-    [ -z "$entries" ] && echo "Calculating..." && return
+    [ -z "$entries" ] && echo '{"status":"'$status'","percent":'$current_percent'}' && return
 
-    local total_seconds=0
-    local count=0
-    local prev_percent prev_time
+    # Calculate rate
+    local first_percent=$(echo "$entries" | head -1 | cut -d',' -f1)
+    local first_time=$(echo "$entries" | head -1 | cut -d',' -f3)
+    local last_percent=$(echo "$entries" | tail -1 | cut -d',' -f1)
+    local last_time=$(echo "$entries" | tail -1 | cut -d',' -f3)
+    
+    local percent_diff=$((first_percent - last_percent))
+    local time_diff=$((last_time - first_time))
+    [ "$percent_diff" -eq 0 ] && echo '{"status":"'$status'","percent":'$current_percent'}' && return
 
-    while read -r line; do
-        local percent=$(echo "$line" | cut -d',' -f1)
-        local time=$(echo "$line" | cut -d',' -f3)
-        
-        if [ -n "$prev_percent" ]; then
-            local percent_diff=$((prev_percent - percent))
-            local time_diff=$((prev_time - time))
-            
-            if [ "$percent_diff" -ne 0 ]; then
-                local seconds_per_percent=$((time_diff / percent_diff))
-                total_seconds=$((total_seconds + seconds_per_percent))
-                count=$((count + 1))
-            fi
-        fi
-        
-        prev_percent=$percent
-        prev_time=$time
-    done <<< "$entries"
+    local secs_per_percent=$((time_diff / percent_diff))
+    local prediction='{"status":"'$status'","percent":'$current_percent',"milestones":{'
 
-    [ "$count" -eq 0 ] && echo "Calculating..." && return
-
-    local avg_seconds=$((total_seconds / count))
-
+    # Generate milestones
     if [ "$status" = "Discharging" ]; then
-        format_time $((current_percent * avg_seconds))
-    elif [ "$status" = "Charging" ]; then
-        format_time $(((100 - current_percent) * avg_seconds))
-    else
-        echo "Ready"
+        for ((target=$((current_percent - MILESTONE_STEP)); target>=0; target-=$MILESTONE_STEP)); do
+            local time=$(( (current_percent - target) * secs_per_percent ))
+            prediction+='"'"$target%"'":"'"$(format_time $time)"'",'
+        done
+    else  # Charging
+        for ((target=$((current_percent + MILESTONE_STEP)); target<=100; target+=$MILESTONE_STEP)); do
+            local time=$(( (target - current_percent) * secs_per_percent ))
+            prediction+='"'"$target%"'":"'"$(format_time $time)"'",'
+        done
     fi
+
+    echo "${prediction%,}}}"
 }
 
-# Display current status
 display_status() {
     local info=$(get_battery_info)
     local percent=$(echo "$info" | cut -d',' -f1)
@@ -113,25 +89,36 @@ display_status() {
     local prediction=$(cat "$PREDICTION_FILE")
 
     clear
-    echo "┌─────────────────────────────────┐"
-    echo "│        Battery Monitor          │"
-    echo "├─────────────────────────────────┤"
-    printf "│ %-20s %6s%% │\n" "Charge:" "$percent"
-    printf "│ %-20s %6s │\n" "Status:" "$status"
-    printf "│ %-20s %6s │\n" "Prediction:" "$prediction"
-    echo "└─────────────────────────────────┘"
-    echo ""
-    echo "Press Ctrl+C to exit"
+    echo "┌───────────────────────────────┐"
+    printf "│ %-15s %10s%% │\n" "Battery:" "$percent"
+    printf "│ %-15s %10s │\n" "Status:" "$status"
+    echo "├───────────────────────────────┤"
+
+    if [ "$status" = "Discharging" ]; then
+        echo "│ Time remaining to:           │"
+        for target in $(echo "$prediction" | jq -r '.milestones | keys[]' 2>/dev/null | sort -n); do
+            printf "│ %3s %-23s │\n" "$target" "$(echo "$prediction" | jq -r ".milestones.\"$target\"")"
+        done
+    elif [ "$status" = "Charging" ]; then
+        echo "│ Time until:                 │"
+        for target in $(echo "$prediction" | jq -r '.milestones | keys[]' 2>/dev/null | sort -n); do
+            printf "│ %3s %-23s │\n" "$target" "$(echo "$prediction" | jq -r ".milestones.\"$target\"")"
+        done
+    else
+        echo "│ $status                      │"
+    fi
+
+    echo "└───────────────────────────────┘"
+    printf " Updated: %-19s \n" "$(date +%H:%M:%S)"
 }
 
-# Main monitoring loop
 main() {
     init_files
-    trap "echo -e '\nMonitoring stopped'; exit" INT
-
+    trap "echo; exit" INT
+    
     while true; do
         record_state
-        calculate_estimate > "$PREDICTION_FILE"
+        calculate_milestones > "$PREDICTION_FILE"
         display_status
         sleep $UPDATE_INTERVAL
     done
