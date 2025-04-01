@@ -1,31 +1,65 @@
 #!/bin/bash
 
-# Battery estimation script
-# Tracks time between percentage changes to predict battery behavior
+# Enhanced Battery Estimation Script
+# Tracks battery behavior and provides accurate time predictions
 
+# Configuration
 LOG_FILE="$HOME/.battery_history"
 PREDICTION_FILE="$HOME/.battery_prediction"
+LOG_LIMIT=1000  # Maximum lines to keep in log file
+UPDATE_INTERVAL=60  # Seconds between updates in monitor mode
 
-# Create log file if it doesn't exist
-if [ ! -f "$LOG_FILE" ]; then
-    touch "$LOG_FILE"
-fi
+# Initialize files
+init_files() {
+    # Create log file if it doesn't exist
+    if [ ! -f "$LOG_FILE" ]; then
+        touch "$LOG_FILE"
+    fi
+    
+    # Create prediction file if it doesn't exist
+    if [ ! -f "$PREDICTION_FILE" ]; then
+        touch "$PREDICTION_FILE"
+        echo "No prediction available" > "$PREDICTION_FILE"
+    fi
+}
+
+# Find battery path
+find_battery_path() {
+    for battery in /sys/class/power_supply/BAT*; do
+        if [ -d "$battery" ]; then
+            echo "$battery"
+            return
+        fi
+    done
+    echo "No battery found" >&2
+    exit 1
+}
 
 # Get current battery info
 get_battery_info() {
-    if [ -d /sys/class/power_supply/BAT0 ]; then
-        BAT_PATH="/sys/class/power_supply/BAT0"
-    elif [ -d /sys/class/power_supply/BAT1 ]; then
-        BAT_PATH="/sys/class/power_supply/BAT1"
-    else
-        echo "No battery found"
-        exit 1
-    fi
-
-    current_percent=$(cat "${BAT_PATH}/capacity")
-    status=$(cat "${BAT_PATH}/status")  # Charging/Discharging
+    BAT_PATH=$(find_battery_path)
     
-    echo "$current_percent,$status,$(date +%s)"
+    current_percent=$(cat "${BAT_PATH}/capacity" 2>/dev/null)
+    status=$(cat "${BAT_PATH}/status" 2>/dev/null)  # Charging/Discharging/Full/Unknown
+    current_now=$(cat "${BAT_PATH}/current_now" 2>/dev/null)
+    voltage_now=$(cat "${BAT_PATH}/voltage_now" 2>/dev/null)
+    
+    # Calculate power in watts if available
+    if [ -n "$current_now" ] && [ -n "$voltage_now" ]; then
+        power_watts=$((current_now * voltage_now / 1000000000000))
+    else
+        power_watts=""
+    fi
+    
+    echo "$current_percent,$status,$(date +%s),$power_watts"
+}
+
+# Rotate log file to prevent it from growing too large
+rotate_log() {
+    if [ $(wc -l < "$LOG_FILE") -gt $LOG_LIMIT ]; then
+        tail -n $((LOG_LIMIT/2)) "$LOG_FILE" > "${LOG_FILE}.tmp"
+        mv "${LOG_FILE}.tmp" "$LOG_FILE"
+    fi
 }
 
 # Record current battery state
@@ -34,13 +68,76 @@ record_battery_state() {
     current_percent=$(echo "$current_info" | cut -d',' -f1)
     last_line=$(tail -n 1 "$LOG_FILE" 2>/dev/null)
     
-    # Only log if percentage changed or status changed
+    # Only log if percentage changed, status changed, or power changed significantly
     if [ -z "$last_line" ] || \
        [ "$current_percent" != "$(echo "$last_line" | cut -d',' -f1)" ] || \
-       [ "$(echo "$current_info" | cut -d',' -f2)" != "$(echo "$last_line" | cut -d',' -f2)" ]; then
+       [ "$(echo "$current_info" | cut -d',' -f2)" != "$(echo "$last_line" | cut -d',' -f2)" ] || \
+       { [ -n "$(echo "$current_info" | cut -d',' -f4)" ] && \
+         [ -n "$(echo "$last_line" | cut -d',' -f4)" ] && \
+         [ $(echo "$current_info" | cut -d',' -f4 | awk '{printf "%.1f", $1}') != \
+           $(echo "$last_line" | cut -d',' -f4 | awk '{printf "%.1f", $1}') ]; }; then
         echo "$current_info" >> "$LOG_FILE"
-        echo "Logged new state: $current_info"  # Debug output
+        rotate_log
     fi
+}
+
+# Calculate weighted average
+calculate_weighted_avg() {
+    local entries="$1"
+    local total_weight=0
+    local total_value=0
+    local count=0
+    
+    prev_percent=""
+    prev_time=""
+    
+    while read -r line; do
+        percent=$(echo "$line" | cut -d',' -f1)
+        time=$(echo "$line" | cut -d',' -f3)
+        power=$(echo "$line" | cut -d',' -f4)
+        
+        if [ -n "$prev_percent" ]; then
+            percent_diff=$((prev_percent - percent))
+            time_diff=$((prev_time - time))
+            
+            if [ "$percent_diff" -ne 0 ] && [ "$time_diff" -gt 0 ]; then
+                seconds_per_percent=$((time_diff / percent_diff))
+                
+                # Calculate weight based on recency and power stability
+                weight=1
+                if [ -n "$power" ]; then
+                    # More weight to entries with similar power usage
+                    current_power=$(echo "$current_info" | cut -d',' -f4)
+                    if [ -n "$current_power" ]; then
+                        power_diff=$(echo "scale=2; $power / $current_power" | bc)
+                        if [ $(echo "$power_diff > 0.8 && $power_diff < 1.2" | bc) -eq 1 ]; then
+                            weight=$((weight + 2))
+                        fi
+                    fi
+                fi
+                
+                # More weight to more recent entries
+                age=$((now - time))
+                if [ "$age" -lt 3600 ]; then  # Less than 1 hour old
+                    weight=$((weight + 1))
+                fi
+                
+                total_value=$((total_value + seconds_per_percent * weight))
+                total_weight=$((total_weight + weight))
+                count=$((count + 1))
+            fi
+        fi
+        
+        prev_percent=$percent
+        prev_time=$time
+    done <<< "$entries"
+    
+    if [ "$count" -eq 0 ] || [ "$total_weight" -eq 0 ]; then
+        echo 0
+        return 1
+    fi
+    
+    echo $((total_value / total_weight))
 }
 
 # Estimate time remaining
@@ -49,61 +146,48 @@ estimate_time() {
     current_percent=$(echo "$current_info" | cut -d',' -f1)
     current_status=$(echo "$current_info" | cut -d',' -f2)
     now=$(echo "$current_info" | cut -d',' -f3)
+    current_power=$(echo "$current_info" | cut -d',' -f4)
     
-    # Get last 5 relevant entries from log
-    relevant_entries=$(grep ",$current_status," "$LOG_FILE" | tail -n 5)
+    # Get relevant entries from log (more for discharging than charging)
+    if [ "$current_status" = "Discharging" ]; then
+        relevant_entries=$(grep ",Discharging," "$LOG_FILE" | tail -n 10)
+    else
+        relevant_entries=$(grep ",Charging," "$LOG_FILE" | tail -n 5)
+    fi
     
     if [ -z "$relevant_entries" ]; then
-        echo "Not enough data to make prediction"
+        prediction="Not enough data to make prediction"
+        echo "$prediction" > "$PREDICTION_FILE"
+        echo "$prediction"
         return
     fi
     
-    total_seconds=0
-    total_percent=0
-    count=0
+    avg_seconds_per_percent=$(calculate_weighted_avg "$relevant_entries")
     
-    prev_percent=""
-    prev_time=""
-    
-    # Calculate average time per percentage point
-    while read -r line; do
-        percent=$(echo "$line" | cut -d',' -f1)
-        time=$(echo "$line" | cut -d',' -f3)
-        
-        if [ -n "$prev_percent" ]; then
-            percent_diff=$((prev_percent - percent))
-            time_diff=$((prev_time - time))
-            
-            if [ "$percent_diff" -ne 0 ]; then
-                seconds_per_percent=$((time_diff / percent_diff))
-                total_seconds=$((total_seconds + seconds_per_percent))
-                total_percent=$((total_percent + percent_diff))
-                count=$((count + 1))
-            fi
-        fi
-        
-        prev_percent=$percent
-        prev_time=$time
-    done <<< "$relevant_entries"
-    
-    if [ "$count" -eq 0 ]; then
-        echo "Not enough data to make prediction"
+    if [ "$avg_seconds_per_percent" -eq 0 ]; then
+        prediction="Not enough data to make prediction"
+        echo "$prediction" > "$PREDICTION_FILE"
+        echo "$prediction"
         return
     fi
-    
-    avg_seconds_per_percent=$((total_seconds / count))
-    echo "Avg seconds per percent: $avg_seconds_per_percent"  # Debug output
     
     if [ "$current_status" = "Discharging" ]; then
         remaining_percent=$current_percent
         remaining_seconds=$((remaining_percent * avg_seconds_per_percent))
         prediction="Time remaining: $(format_seconds $remaining_seconds)"
+        
+        # Add power info if available
+        if [ -n "$current_power" ]; then
+            prediction="$prediction (≈$(printf "%.1f" $current_power)W)"
+        fi
     elif [ "$current_status" = "Charging" ]; then
         remaining_percent=$((100 - current_percent))
         remaining_seconds=$((remaining_percent * avg_seconds_per_percent))
         prediction="Time to full charge: $(format_seconds $remaining_seconds)"
+    elif [ "$current_status" = "Full" ]; then
+        prediction="Battery fully charged"
     else
-        prediction="Unknown battery status"
+        prediction="Unknown battery status: $current_status"
     fi
     
     # Save prediction to file
@@ -113,6 +197,11 @@ estimate_time() {
 
 format_seconds() {
     seconds=$1
+    if [ "$seconds" -lt 0 ]; then
+        echo "calculating..."
+        return
+    fi
+    
     hours=$((seconds / 3600))
     minutes=$(( (seconds % 3600) / 60 ))
     
@@ -123,28 +212,63 @@ format_seconds() {
     fi
 }
 
+# Display current status
+show_status() {
+    current_info=$(get_battery_info)
+    current_percent=$(echo "$current_info" | cut -d',' -f1)
+    current_status=$(echo "$current_info" | cut -d',' -f2)
+    power=$(echo "$current_info" | cut -d',' -f4)
+    
+    echo "Current Battery Status:"
+    echo "  Percentage: $current_percent%"
+    echo "  Status: $current_status"
+    if [ -n "$power" ]; then
+        echo "  Power: $(printf "%.1f" $power)W"
+    fi
+    echo "  Last prediction: $(cat "$PREDICTION_FILE")"
+}
+
 # Main program
-case "$1" in
-    "--record")
-        record_battery_state
-        ;;
-    "--estimate")
-        estimate_time
-        ;;
-    "--monitor")
-        echo "Monitoring battery (Ctrl+C to stop)..."
-        while true; do
+main() {
+    init_files
+    
+    case "$1" in
+        "--record")
             record_battery_state
+            ;;
+        "--estimate")
             estimate_time
-            cat "$PREDICTION_FILE"
-            sleep 60
-        done
-        ;;
-    *)
-        echo "Usage: $0 [option]"
-        echo "Options:"
-        echo "  --record    Record current battery state"
-        echo "  --estimate  Estimate time remaining/until full charge"
-        echo "  --monitor   Continuously monitor and estimate battery"
-        ;;
-esac
+            ;;
+        "--status")
+            show_status
+            ;;
+        "--monitor")
+            echo "Starting battery monitoring..."
+            echo "Press Ctrl+C to stop"
+            trap "echo 'Monitoring stopped'; exit" INT
+            while true; do
+                clear
+                record_battery_state
+                estimate_time
+                show_status
+                sleep $UPDATE_INTERVAL
+            done
+            ;;
+        "--reset")
+            echo "Resetting battery history..."
+            > "$LOG_FILE"
+            echo "No prediction available" > "$PREDICTION_FILE"
+            ;;
+        *)
+            echo "Usage: $0 [option]"
+            echo "Options:"
+            echo "  --record    Record current battery state"
+            echo "  --estimate  Estimate time remaining/until full charge"
+            echo "  --status    Show current battery status and last prediction"
+            echo "  --monitor   Continuously monitor and estimate battery"
+            echo "  --reset     Reset battery history"
+            ;;
+    esac
+}
+
+main "$@"
