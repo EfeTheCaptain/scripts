@@ -32,7 +32,35 @@ get_discharging_emoji() {
 
 get_color() {
     local capacity=$1
-    if [ "$capacity" -le 10 ]; then echo "^c#ee0909^"; elif [ "$capacity" -le 20 ]; then echo "^c#ee2789^"; elif [ "$capacity" -le 30 ]; then echo "^c#ee5789^"; elif [ "$capacity" -le 40 ]; then echo "^c#ee9789^"; elif [ "$capacity" -le 50 ]; then echo "^c#e3ee09^"; elif [ "$capacity" -le 60 ]; then echo "^c#b1ee09^"; elif [ "$capacity" -le 70 ]; then echo "^c#78ee09^"; elif [ "$capacity" -le 78 ]; then echo "^c#28ee09^"; elif [ "$capacity" -le 90 ]; then echo "^c#09eec4^"; else echo "^c#0942ee^"; fi
+    local format=${2:-dwm}  # Default to dwm format
+    
+    if [ "$format" = "terminal" ]; then
+        # ANSI color codes (for terminal testing)
+        if [ "$capacity" -le 10 ]; then echo -e "\033[31m";    # Red
+        elif [ "$capacity" -le 20 ]; then echo -e "\033[35m";  # Magenta
+        elif [ "$capacity" -le 30 ]; then echo -e "\033[95m";  # Light Magenta
+        elif [ "$capacity" -le 40 ]; then echo -e "\033[91m"; # Light Red
+        elif [ "$capacity" -le 50 ]; then echo -e "\033[33m"; # Yellow
+        elif [ "$capacity" -le 60 ]; then echo -e "\033[93m";  # Light Yellow
+        elif [ "$capacity" -le 70 ]; then echo -e "\033[32m"; # Green
+        elif [ "$capacity" -le 78 ]; then echo -e "\033[92m"; # Light Green
+        elif [ "$capacity" -le 90 ]; then echo -e "\033[36m"; # Cyan
+        else echo -e "\033[34m";                               # Blue
+        fi
+    else
+        # Original dwmblocks format
+        if [ "$capacity" -le 10 ]; then echo "^c#ee0909^";
+        elif [ "$capacity" -le 20 ]; then echo "^c#ee2789^";
+        elif [ "$capacity" -le 30 ]; then echo "^c#ee5789^";
+        elif [ "$capacity" -le 40 ]; then echo "^c#ee9789^";
+        elif [ "$capacity" -le 50 ]; then echo "^c#e3ee09^";
+        elif [ "$capacity" -le 60 ]; then echo "^c#b1ee09^";
+        elif [ "$capacity" -le 70 ]; then echo "^c#78ee09^";
+        elif [ "$capacity" -le 78 ]; then echo "^c#28ee09^";
+        elif [ "$capacity" -le 90 ]; then echo "^c#09eec4^";
+        else echo "^c#0942ee^";
+        fi
+    fi
 }
 
 # Loop through all attached batteries
