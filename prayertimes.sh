@@ -19,30 +19,30 @@ get_remaining_time() {
     
     # Get current time
     now=$(date +%H:%M)
-    now_sec=$(date -d "$now" +%s)
+    now_sec=$(date -d "$now" +%s 2>/dev/null || date -j -f "%H:%M" "$now" +%s 2>/dev/null)
     
     # Find next prayer time
-    while IFS= read -r line; do
+    echo "$prayer_times" | while IFS= read -r line; do
         prayer_name=$(echo "$line" | cut -d: -f1)
         prayer_time=$(echo "$line" | awk '{print $2}')
-        prayer_sec=$(date -d "$prayer_time" +%s)
+        prayer_sec=$(date -d "$prayer_time" +%s 2>/dev/null || date -j -f "%H:%M" "$prayer_time" +%s 2>/dev/null)
         
         if [ "$prayer_sec" -gt "$now_sec" ]; then
             time_left=$((prayer_sec - now_sec))
             hours=$((time_left / 3600))
             minutes=$(( (time_left % 3600) / 60 ))
-            printf "Time left until %s: %02d:%02d" "$prayer_name" "$hours" "$minutes"
-            return
+            printf "Time left until %s: %02d:%02d\n" "$prayer_name" "$hours" "$minutes"
+            exit 0
         fi
-    done <<< "$prayer_times"
+    done
     
     # If all prayers passed, show time until next Imsak
     imsak_time=$(grep 'İmsak:' "$cache_file" | awk '{print $2}')
-    imsak_sec=$(date -d "$imsak_time" +%s)
+    imsak_sec=$(date -d "$imsak_time" +%s 2>/dev/null || date -j -f "%H:%M" "$imsak_time" +%s 2>/dev/null)
     time_left=$((imsak_sec - now_sec + 86400))  # Add 24 hours in seconds
     hours=$((time_left / 3600))
     minutes=$(( (time_left % 3600) / 60 ))
-    printf "Time left until İmsak (Tomorrow): %02d:%02d" "$hours" "$minutes"
+    printf "Time left until İmsak (Tomorrow): %02d:%02d\n" "$hours" "$minutes"
 }
 
 check_cache || fetch_data
