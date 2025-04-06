@@ -22,17 +22,17 @@ send_notification() {
 
 get_charging_emoji() {
     local capacity=$1
-    if [ "$capacity" -le 10 ]; then echo "󰢜"; elif [ "$capacity" -le 20 ]; then echo "󰂆"; elif [ "$capacity" -le 30 ]; then echo "󰂇"; elif [ "$capacity" -le 40 ]; then echo "󰂈"; elif [ "$capacity" -le 50 ]; then echo "󰢝"; elif [ "$capacity" -le 60 ]; then echo "󰂉"; elif [ "$capacity" -le 70 ]; then echo "󰢞"; elif [ "$capacity" -le 80 ]; then echo "󰂊"; elif [ "$capacity" -le 90 ]; then echo "󱊦"; else echo "󱊦"; fi
+    if [ "$capacity" -le 10 ]; then echo "󰢜"; elif [ "$capacity" -le 20 ]; then echo "󰂆"; elif [ "$capacity" -le 30 ]; then echo "󰂇"; elif [ "$capacity" -le 40 ]; then echo "󰂈"; elif [ "$capacity" -le 50 ]; then echo "󰢝"; elif [ "$capacity" -le 60 ]; then echo "󰂉"; elif [ "$capacity" -le 70 ]; then echo "󰢞"; elif [ "$capacity" -le 78 ]; then echo "󰂊"; elif [ "$capacity" -le 90 ]; then echo "󱊦"; else echo "󱊦"; fi
 }
 
 get_discharging_emoji() {
     local capacity=$1
-    if [ "$capacity" -le 10 ]; then echo "󰁺"; elif [ "$capacity" -le 20 ]; then echo "󰁻"; elif [ "$capacity" -le 30 ]; then echo "󰁼"; elif [ "$capacity" -le 40 ]; then echo "󰁽"; elif [ "$capacity" -le 50 ]; then echo "󰁾"; elif [ "$capacity" -le 60 ]; then echo "󰁿"; elif [ "$capacity" -le 70 ]; then echo "󰂀"; elif [ "$capacity" -le 80 ]; then echo "󰂁"; elif [ "$capacity" -le 90 ]; then echo "󰂂"; else echo "󰁹"; fi
+    if [ "$capacity" -le 10 ]; then echo "󰁺"; elif [ "$capacity" -le 20 ]; then echo "󰁻"; elif [ "$capacity" -le 30 ]; then echo "󰁼"; elif [ "$capacity" -le 40 ]; then echo "󰁽"; elif [ "$capacity" -le 50 ]; then echo "󰁾"; elif [ "$capacity" -le 60 ]; then echo "󰁿"; elif [ "$capacity" -le 70 ]; then echo "󰂀"; elif [ "$capacity" -le 78 ]; then echo "󰂁"; elif [ "$capacity" -le 90 ]; then echo "󰂂"; else echo "󰁹"; fi
 }
 
 get_color() {
     local capacity=$1
-    if [ "$capacity" -le 10 ]; then echo "^c#ee0909^"; elif [ "$capacity" -le 20 ]; then echo "^c#ee2809^"; elif [ "$capacity" -le 30 ]; then echo "^c#ee5809^"; elif [ "$capacity" -le 40 ]; then echo "^c#ee9809^"; elif [ "$capacity" -le 50 ]; then echo "^c#e3ee09^"; elif [ "$capacity" -le 60 ]; then echo "^c#b1ee09^"; elif [ "$capacity" -le 70 ]; then echo "^c#78ee09^"; elif [ "$capacity" -le 80 ]; then echo "^c#28ee09^"; elif [ "$capacity" -le 90 ]; then echo "^c#09eec4^"; else echo "^c#0942ee^"; fi
+    if [ "$capacity" -le 10 ]; then echo "^c#ee0909^"; elif [ "$capacity" -le 20 ]; then echo "^c#ee2789^"; elif [ "$capacity" -le 30 ]; then echo "^c#ee5789^"; elif [ "$capacity" -le 40 ]; then echo "^c#ee9789^"; elif [ "$capacity" -le 50 ]; then echo "^c#e3ee09^"; elif [ "$capacity" -le 60 ]; then echo "^c#b1ee09^"; elif [ "$capacity" -le 70 ]; then echo "^c#78ee09^"; elif [ "$capacity" -le 78 ]; then echo "^c#28ee09^"; elif [ "$capacity" -le 90 ]; then echo "^c#09eec4^"; else echo "^c#0942ee^"; fi
 }
 
 # Loop through all attached batteries
@@ -49,7 +49,7 @@ for battery in /sys/class/power_supply/BAT?*; do
                 emoji=$(get_charging_emoji "$capacity")
                 rm -f "$critical_notified_file" "$low_notified_file"
 
-                if [ "$capacity" -ge 80 ] && [ ! -f "$high_notified_file" ]; then
+                if [ "$capacity" -ge 78 ] && [ ! -f "$high_notified_file" ]; then
                     send_notification normal "Battery Full Enough" "Battery at ${capacity}%, consider unplugging!" "$high_sound_file"
                     touch "$high_notified_file"
                 fi
