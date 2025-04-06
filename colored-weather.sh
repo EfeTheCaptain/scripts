@@ -46,7 +46,7 @@ case $BLOCK_BUTTON in
 	1)
   	aplay /home/efe/audio/ss-click.wav
         timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-        notify-send "Weather" "$message\nLast Checked: $timestamp" ;;  
+        notify-send "Weather" "\n$message\n\nLast Checked: $timestamp" ;;  
    
 
 	6)  aplay /home/efe/audio/ss-click.wav 
