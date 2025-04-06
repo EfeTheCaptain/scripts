@@ -4,13 +4,11 @@
 critical_notified_file="/tmp/battery_critical_notified"
 low_notified_file="/tmp/battery_low_notified"
 high_notified_file="/tmp/battery_high_notified"
-<<<<<<< HEAD
 
 urgent_sound_file="/home/$USER/audio/bell-meme.wav"
 low_sound_file="/home/$USER/audio/soft-alert.wav"
 high_sound_file="/home/$USER/audio/ui-pop.wav"
 
-click_sound_file="/home/$USER/audio/ss-click.wav"
 # Function to send notification with sound
 send_notification() {
     local urgency=$1
@@ -21,11 +19,6 @@ send_notification() {
     notify-send -u "$urgency" "$title" "$message"
     [ -f "$sound_file" ] && aplay "$sound_file" &
 }
-=======
-urgent_sound_file="/home/$USER/audio/bell-meme.wav"
-low_sound_file="/home/$USER/audio/soft-alert.wav"
-high_sound_file="/home/$USER/audio/ui-pop.wav"
->>>>>>> refs/remotes/origin/main
 
 get_charging_emoji() {
     local capacity=$1
@@ -55,17 +48,9 @@ for battery in /sys/class/power_supply/BAT?*; do
             Charging)
                 emoji=$(get_charging_emoji "$capacity")
                 rm -f "$critical_notified_file" "$low_notified_file"
-<<<<<<< HEAD
 
                 if [ "$capacity" -ge 80 ] && [ ! -f "$high_notified_file" ]; then
                     send_notification normal "Battery Full Enough" "Battery at ${capacity}%, consider unplugging!" "$high_sound_file"
-=======
-        
-                # Notify when battery reaches 80% while charging
-                if [ "$capacity" -ge 80 ] && [ ! -f "$high_notified_file" ]; then
-                    notify-send -u normal "Battery Full Enough" "Battery at ${capacity}%, consider unplugging!"
-                    aplay "$high_sound_file"
->>>>>>> refs/remotes/origin/main
                     touch "$high_notified_file"
                 fi
                 ;;
@@ -73,7 +58,6 @@ for battery in /sys/class/power_supply/BAT?*; do
                 emoji=$(get_discharging_emoji "$capacity")
 
                 if [ "$capacity" -le 10 ] && [ ! -f "$critical_notified_file" ]; then
-<<<<<<< HEAD
                     send_notification critical "Battery Critical" "Battery at ${capacity}%! Plug in now!" "$urgent_sound_file"
                     touch "$critical_notified_file"
                 elif [ "$capacity" -le 20 ] && [ ! -f "$low_notified_file" ]; then
@@ -82,23 +66,12 @@ for battery in /sys/class/power_supply/BAT?*; do
                 fi
 
                 rm -f "$high_notified_file" # Reset high notification when discharging
-=======
-                    notify-send -u critical "Battery Critical" "Battery at ${capacity}%! Plug in now!"
-                    aplay "$urgent_sound_file"
-                    touch "$critical_notified_file"
-                elif [ "$capacity" -le 20 ] && [ ! -f "$low_notified_file" ]; then
-                    notify-send -u normal "Battery Low" "Battery at ${capacity}%!"
-                    aplay "$low_sound_file"
-                    touch "$low_notified_file"
-                fi
-                rm -f "$high_notified_file"  # Reset high notification when discharging
->>>>>>> refs/remotes/origin/main
                 ;;
             Not\ charging)
                 emoji="󰂃" # Not charging
                 ;;
             Unknown)
-                emoji="󱠴" # Passive Charging / Unknown 
+                emoji="󱠴" # Unknown state
                 ;;
         esac
 
@@ -109,9 +82,6 @@ for battery in /sys/class/power_supply/BAT?*; do
 done
 
 case $BLOCK_BUTTON in
-    1)	aplay "$click_sound_file"
-	notify-send "$(acpi -b | sed -E 's/^Battery [0-9]+: //; s/, //; s/([0-9]+)%$/\n\1%/')" ;;
-    
-    6)	aplay "$click_sound_file"
-	st -e nvim "$0" ;;
+    1) notify-send "$(acpi -b | sed -E 's/^Battery [0-9]+: //; s/, //; s/([0-9]+)%$/\n\1%/')" ;;
+    6) st -e nvim "$0" ;;
 esac
